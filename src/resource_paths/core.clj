@@ -1,0 +1,34 @@
+(ns resource-paths.core
+  (:require [clojure.java.io :as jio]
+            [clojure.string :as string])
+  (:gen-class))
+                                       
+(defn all-resource-paths []
+  (->> (jio/file "resources") ; This will not work inside a jar file. 
+       (file-seq)
+       (filter (fn [x] (.isFile x)))
+       (map (fn [x] (.getCanonicalPath x)))))
+
+(defn all-relative-paths []
+  (let [resource-path (.getCanonicalPath (jio/file "resources"))
+        all-paths     (all-resource-paths)]
+    (assert (reduce (fn [x y] (and x y))
+                    true
+                    (map (fn [s] (string/starts-with? s resource-path)) all-paths))
+            "Unexpected path not on the resource path")
+    (map (fn [s] (string/replace-first s (str resource-path "/") "")) all-paths)))
+
+(defn paths-match-regex [paths re]
+  (filter (fn [s] (re-matches re s)) paths))
+
+(defn paths-match-regexes [regexes]
+  (let [paths (all-relative-paths)]
+    (set (flatten (map (fn [r] (paths-match-regex paths r)) regexes)))))
+
+(def regexes (set [#"public/.*"]))
+
+(defn -main
+  "main func"
+  [& args]
+  (println (str "resource path: " (.getCanonicalPath (jio/file "resources"))))
+  (println (paths-match-regexes regexes)))
